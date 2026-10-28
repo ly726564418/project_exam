@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#111713">
+  <meta name="description" content="探索持续演化的宇宙万物。真实数据、动态分类与可追溯的观测档案。">
+  <title>ATLAS · 宇宙万物观测站</title>
+  <link rel="stylesheet" href="/assets/style.css">
+  <script src="/assets/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Atlas 首页"><span class="brand-orbit" aria-hidden="true"></span><strong>ATLAS</strong><span class="brand-sub">宇宙万物观测站</span></a>
+    <div class="top-right"><span class="connection"><i id="connection-dot"></i><span id="connection-label">连接观测网络</span></span><span class="separator"></span><button id="open-control" class="button small">接入发生器 <span aria-hidden="true">↗</span></button></div>
+  </header>
+  <div class="shell">
+    <aside class="rail" aria-label="主导航">
+      <div class="rail-label">工作空间</div>
+      <nav>
+        <button class="nav-item active" data-view="explore"><span class="nav-icon" aria-hidden="true">◎</span>宇宙探索<span class="nav-key">01</span></button>
+        <button class="nav-item" data-view="catalog"><span class="nav-icon" aria-hidden="true">▤</span>观测档案<span class="nav-key">02</span></button>
+        <button class="nav-item" data-view="schema"><span class="nav-icon" aria-hidden="true">⌘</span>属性图谱<span class="nav-key">03</span></button>
+        <button class="nav-item" data-view="quality"><span class="nav-icon" aria-hidden="true">◷</span>数据与运行<span class="nav-key">04</span></button>
+      </nav>
+      <div class="rail-bottom"><div class="tiny">观测原则</div><p>保留每一次发现。<br>理解每一种变化。</p><a href="/docs" target="_blank" rel="noreferrer">接口文档 <span aria-hidden="true">↗</span></a><div class="rail-sign">SINGLE NODE / INFINITE CURIOSITY</div></div>
+    </aside>
+    <main>
+      <section class="page-heading"><div><div class="eyebrow">THE UNIVERSE, IN OBSERVATION</div><h1 id="page-title">宇宙，正在被看见<span class="heading-dot">。</span></h1><p id="page-description">让陌生的事物有迹可循，让变化的世界清晰可见。</p></div><button id="live-toggle" class="live-button" aria-pressed="true"><i></i><span>实时观测</span><span class="pause-icon" aria-hidden="true">Ⅱ</span></button></section>
+      <section class="metrics" aria-label="观测指标">
+        <div class="metric"><div class="metric-label">已收录对象 <span>OBJECTS</span></div><div class="metric-value" id="metric-objects">0</div><div class="metric-note" id="metric-run">等待首批观测数据</div></div>
+        <div class="metric"><div class="metric-label">已知分类 <span>TAXONOMY</span></div><div class="metric-value" id="metric-types">0</div><div class="metric-note" id="metric-revision">随世界持续演化</div></div>
+        <div class="metric"><div class="metric-label">收录速率 <span>THROUGHPUT</span></div><div class="metric-value"><span id="metric-rate">0</span><small>对象 / 秒</small></div><div class="metric-note">全站最近 1 秒采样</div></div>
+        <div class="metric"><div class="metric-label">可靠落盘 <span>DURABILITY</span></div><div class="metric-value"><span id="metric-latency">0</span><small>ms</small></div><div class="metric-note">最近 1,000 次确认的 P95</div></div>
+      </section>
+      <div class="workspace-toolbar"><div class="run-field"><span>观测批次</span><select id="run-select" aria-label="选择观测批次"><option value="">暂无数据</option></select><span id="demo-label" class="badge hidden">演示</span></div><div class="toolbar-actions"><span id="updated-at" class="muted">尚未同步</span><button class="text-button" id="demo-button">载入演示世界 <span aria-hidden="true">↗</span></button></div></div>
+      <div class="workbench">
+        <aside class="taxonomy"><div class="panel-heading"><h2>万物分类</h2><button id="clear-type" class="text-button">全部</button></div><div class="taxonomy-search"><input id="type-search" placeholder="查找分类…" aria-label="查找分类"></div><div id="type-tree" class="type-tree"><p class="empty-small">分类会随首条消息到达。</p></div><div class="taxonomy-foot"><i class="semantic-dot"></i><span id="taxonomy-version">分类树尚未建立</span></div></aside>
+        <div class="workspace-content">
+          <section id="view-explore" class="view active">
+            <div class="section-toolbar"><div><h2>星图视野 <span id="map-type-label">全部对象</span></h2></div><select id="frame-select" aria-label="选择坐标参考系"><option value="">暂无坐标系</option></select></div>
+            <div class="explore-grid"><div class="map-wrap"><canvas id="universe" tabindex="0" aria-label="对象空间分布，可拖动平移、滚轮缩放；通过右侧列表查看对象档案"></canvas><div class="map-top"><span class="map-tag">XY 正交投影</span><span id="map-frame">等待坐标数据</span></div><div id="map-empty" class="map-empty"><span class="empty-orbit">◎</span><h3>观测，即将开始</h3><p>接入发生器，或载入演示世界，<br>探索第一批宇宙发现。</p><button id="empty-demo" class="button accent">开启演示世界 ↗</button></div><div class="map-controls"><button id="zoom-in" aria-label="放大星图">+</button><button id="zoom-out" aria-label="缩小星图">−</button><button id="zoom-fit" aria-label="重置视野">⊙</button></div><div class="map-bottom"><span><i class="semantic-dot"></i><span id="map-count">0 个空间观测</span></span><span id="map-scale">坐标单位由数据源指定</span></div><div id="map-tooltip" class="map-tooltip hidden"></div></div><aside class="discoveries"><div class="discovery-heading"><h3>最近发现</h3><span>RECENT</span></div><div id="recent-objects" class="recent-objects"></div><button id="view-all" class="view-all">浏览观测档案 <span>↗</span></button></aside></div>
+            <div class="explore-footer"><section class="activity"><div class="activity-title"><h3>观测脉搏</h3><span>全站实时收录 / 秒</span></div><canvas id="pulse" aria-label="最近 90 秒收录速率图"></canvas><div class="chart-labels"><span>90 秒前</span><span>现在</span></div></section><section class="distribution"><h3>世界的构成</h3><div id="type-distribution"></div></section></div>
+          </section>
+          <section id="view-catalog" class="view"><div class="section-toolbar"><h2>观测档案 <span id="catalog-type-label">全部对象</span></h2><label class="check-label"><input type="checkbox" id="anomaly-only"> 仅异常标记</label></div><form id="search-form" class="search-form"><input id="object-search" placeholder="搜索对象名称或 ID…" aria-label="搜索对象名称或 ID"><button class="button" type="submit">搜索</button><button class="text-button" type="button" id="filter-toggle">属性筛选 ↓</button></form><div id="advanced-filters" class="advanced-filters hidden"><label>属性路径<input id="attr-path" placeholder="mass_solar 或 orbit.altitude_km"></label><label>等于<input id="attr-value" placeholder="留空忽略"></label><label>数值 ≥<input id="attr-min" type="number" step="any"></label><label>数值 ≤<input id="attr-max" type="number" step="any"></label><button id="apply-filter" class="button">应用</button><button id="clear-filter" class="text-button">清除</button></div><div id="catalog-selection" class="filter-note">点击一条观测，查看完整属性与原始来源。</div><div class="table-scroll"><table class="object-table"><thead><tr><th>观测对象</th><th>当前分类</th><th>参考系</th><th>观测时间</th><th>状态</th></tr></thead><tbody id="object-rows"></tbody></table></div><div class="pagination"><span id="page-note">每页最多 50 条 · 按收录顺序</span><div><button class="button" id="previous-page" disabled>上一页</button><button class="button" id="next-page" disabled>下一页 →</button></div></div></section>
+          <section id="view-schema" class="view"><div class="section-toolbar"><h2>属性图谱</h2><span class="muted">从实际观测中发现结构</span></div><p class="section-intro">每种新属性都有位置。相同路径出现不同数据类型时，保留差异，呈现变化。</p><div id="schema-summary" class="schema-summary"></div><div class="table-scroll"><table><thead><tr><th>属性路径</th><th>观测到的类型</th><th>出现次数</th><th>真实样本</th></tr></thead><tbody id="field-rows"></tbody></table></div></section>
+          <section id="view-quality" class="view"><div class="section-toolbar"><h2>数据与运行</h2><a href="/api/stats" target="_blank" rel="noreferrer" class="text-button">查看指标 JSON ↗</a></div><div id="quality-summary" class="quality-summary"></div><h3 class="subheading">可靠接入</h3><div class="durability-explainer"><span class="durable-symbol">✓</span><p><strong>先保存，再确认。</strong>每条成功接收的消息都有原始副本和 SHA-256 指纹。未完成的处理会在重启后继续；异常内容保留在隔离区，随时可以追溯。</p></div><h3 class="subheading">待核查消息</h3><div id="quarantine-list"></div><h3 class="subheading">分类演化记录</h3><div id="type-history" class="history-list"></div><h3 class="subheading">最近接入记录</h3><div id="receipt-list"></div></section>
+        </div>
+      </div>
+      <footer class="page-footer"><span>ATLAS OBSERVATORY</span><span>每一个未知，都值得被看见。</span><span id="footer-storage">本地持久化 · 等待数据</span></footer>
+    </main>
+  </div>
+  <div id="drawer-backdrop" class="drawer-backdrop hidden"></div><aside id="detail-drawer" class="detail-drawer hidden" aria-label="观测详情" role="dialog" aria-modal="true" tabindex="-1"><div class="drawer-top"><span>观测档案 / OBSERVATION</span><button id="close-drawer" class="icon-button" aria-label="关闭详情">×</button></div><div id="detail-content"></div></aside>
+  <dialog id="control-dialog"><form method="dialog" class="dialog-top"><h2>接入观测网络</h2><button class="icon-button" aria-label="关闭发生器控制">×</button></form><p>连接题目提供的发生器。数据接收地址为 <code>/ingest</code>，所有运行使用独立批次。</p><div id="generator-state" class="generator-state">正在查询发生器…</div><form id="generator-form"><label>本轮 test_id<input id="gen-test-id" required maxlength="100"></label><div class="form-pair"><label>目标对象 / 秒<input id="gen-rate" type="number" value="1000" min="0" max="1000000" required></label><label>运行时长 / 秒<input id="gen-duration" type="number" value="60" min="1" max="3600" required></label></div><label>容器内可访问的接收地址<input id="gen-target" value="http://host.docker.internal:8000/ingest" required></label><div class="form-pair"><label>每批对象数<input id="gen-batch" type="number" value="100" min="1" max="1000" required></label><label>发送 worker 数<input id="gen-workers" type="number" value="4" min="1" max="32" required></label></div><div class="dialog-actions"><button class="button" type="button" id="stop-generator">停止发生器</button><button class="button accent" id="start-generator" type="submit">开始观测 ↗</button></div></form><p class="dialog-note">速率 0 表示尽力发送。启动发生器容器的命令见 README；容器限制为 1 vCPU / 256 MiB。</p></dialog>
+  <div id="toast" class="toast hidden" role="status"></div>
+</body>
+</html>

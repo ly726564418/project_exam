@@ -1,0 +1,12 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+data/
+generator-runs/
+scratch/
+node_modules/
+宇宙万物观测站候选人发题包/
+.env
+*.sqlite*
+
