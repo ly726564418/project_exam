@@ -12,6 +12,8 @@ with sync_playwright() as p:
     errors=[]
     page.on('pageerror',lambda error:errors.append(str(error)))
     page.goto(BASE)
+    if page.request.get(BASE+'/api/stats').json()['objects']==0:
+        page.locator('#demo-button').click()
     expect(page.locator('#metric-objects')).not_to_have_text('0')
     demos=page.locator('#run-select option').evaluate_all("options => options.map(o => o.value).filter(v => v.startsWith('demo-'))")
     if demos:
@@ -57,6 +59,11 @@ with sync_playwright() as p:
     page.wait_for_timeout(700)
     assert page.evaluate('document.documentElement.scrollWidth <= window.innerWidth'), 'mobile horizontal overflow'
     page.screenshot(path=str(OUT/'explore-mobile.png'),full_page=True)
+    page.goto(BASE+'/docs')
+    page.wait_for_selector('.api-endpoint')
+    assert page.locator('.api-route').count()>10
     assert not errors,errors
-    print(json.dumps({'browser':'Microsoft Edge headless','desktop':'1600x1100','mobile':'390x844','console_errors':errors,'checks':12,'screenshots':str(OUT)},ensure_ascii=False))
+    result={'browser':'Microsoft Edge headless','desktop':'1600x1100','mobile':'390x844','page_errors':errors,'checks':13,'screenshots':str(OUT)}
+    Path('docs/results/browser-check.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),encoding='utf-8')
+    print(json.dumps(result,ensure_ascii=False))
     browser.close()

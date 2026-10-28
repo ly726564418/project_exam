@@ -95,10 +95,12 @@ docker compose cp docs/results/your-run-receipt.json atlas:/tmp/receipt.json
 docker compose exec -e PYTHONPATH=/app atlas python /tmp/verify_run.py --db /data/atlas.sqlite --receipt /tmp/receipt.json
 ```
 
-脚本逐条验证原文 SHA-256、每个合法对象内容、有效唯一对象数量、常规 ACK bitmap 对应对象是否全部存在，以及待办是否排空。额外故障注入对象与常规 ACK 对象分开计量。
+脚本逐条验证原文 SHA-256、合法对象内容、有效唯一对象数、常规 ACK bitmap 对应对象是否全部存在、已确认分类修订是否齐全、类型历史与当前名称/父级是否符合原文、待办是否排空。额外故障注入对象与常规 ACK 对象分开计量。
 
 ## 备份与运维
 
 通过 `sqlite3.Connection.backup()` 做在线一致性备份，或先停系统再备份完整卷。**运行中只复制 `.sqlite` 可能遗漏 WAL，不能作为可靠备份。** 停发生器后等 pending=0，再 `docker compose stop`。
+
+提供 `python scripts/backup.py --db data/atlas.sqlite --output data/backup-new.sqlite`，不会覆盖已有目标，完成后执行 SQLite quick_check。容器内可将脚本复制到 `/tmp` 后运行，输出到持久化卷，再 `docker compose cp` 导出。
 
 容量不足、数据库损坏或写入器停止时，先停止发生器，保留卷、日志、原文与 receipt；不要删除数据或忽略错误继续确认。进程恢复测试不等于断电测试，未声称抵抗宿主存储损坏。

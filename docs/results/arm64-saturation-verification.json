@@ -1,0 +1,18 @@
+{
+  "test_id": "arm64-saturation",
+  "verified_raw_messages": 367,
+  "raw_digest_errors": 0,
+  "acknowledged_normal_batches": 328,
+  "acknowledged_normal_objects": 65600,
+  "missing_acknowledged_objects": 0,
+  "missing_examples": [],
+  "valid_unique_objects_in_raw": 66796,
+  "stored_objects": 66796,
+  "invalid_objects_in_raw": 4,
+  "object_content_errors": 0,
+  "pending_messages": 0,
+  "verified_types": 70,
+  "type_content_errors": 0,
+  "missing_acknowledged_revisions": [],
+  "passed": true
+}

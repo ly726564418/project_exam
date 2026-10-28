@@ -1,0 +1,8 @@
+{
+  "browser": "Microsoft Edge headless",
+  "desktop": "1600x1100",
+  "mobile": "390x844",
+  "page_errors": [],
+  "checks": 13,
+  "screenshots": "docs\\screenshots"
+}

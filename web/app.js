@@ -11,7 +11,7 @@ let toastTimer;
 function toast(message) { $('#toast').textContent = message; $('#toast').classList.remove('hidden'); clearTimeout(toastTimer); toastTimer = setTimeout(() => $('#toast').classList.add('hidden'), 5200); }
 async function api(path, options={}) {
   const response=await fetch(path, options);
-  if (!response.ok) { let msg; try {msg=(await response.json()).detail;} catch {msg='请求失败 (' + response.status + ')';} throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg)); }
+  if (!response.ok) { let msg; try {const body=await response.json();msg=body.detail || body.error || body.message || '请求失败 ('+response.status+')';} catch {msg='请求失败 (' + response.status + ')';} throw new Error(typeof msg === 'string' ? msg : JSON.stringify(msg)); }
   return response.json();
 }
 function url(path, extra={}) { const params=new URLSearchParams({run:state.run,...extra}); for (const [k,v] of [...params.entries()]) if (v === '' || v === 'null' || v === 'undefined') params.delete(k); return path+'?'+params; }
@@ -24,7 +24,7 @@ function topType(id) {
   return last;
 }
 function colorFor(id) { return palettes[Math.abs(topType(id)-2)%palettes.length]; }
-function pathFor(id, nodes=state.types) {const result=[],seen=new Set();let node=nodes.find(t=>t.type_id===id);while(node && !seen.has(node.type_id)){seen.add(node.type_id);result.unshift(node.name);node=nodes.find(t=>t.type_id===node.parent_id);}return result.join(' / ') || '待识别分类 #'+id;}
+function pathFor(id, nodes=state.types) {const index=nodes===state.types?state.typeMap:new Map(nodes.map(n=>[n.type_id,n]));const result=[],seen=new Set();let node=index.get(id);while(node && !seen.has(node.type_id)){seen.add(node.type_id);result.unshift(node.name);node=index.get(node.parent_id);}return result.join(' / ') || '待识别分类 #'+id;}
 
 function renderMetrics() {
   const stats=state.stats, run=stats.runs.find(r=>r.id===state.run);
@@ -103,7 +103,7 @@ async function loadFields() {
 }
 async function loadQuality() {
   const quality=await api(url('/api/quality')),stats=state.stats,c=stats.counters,s=stats.statuses;
-  const items=[['可靠接收',c.requests,'全站 HTTP 确认次数'],['整包去重',c.duplicates,'相同原始字节只保存一份'],['待处理',(s.pending||0),'已落盘、等待建立查询视图'],['隔离消息',s.quarantined||0,'全站保留原文的异常消息'],['无效对象',c.invalid_objects,'逐对象校验未通过'],['磁盘占用',bytes(stats.disk_bytes),'预算 '+bytes(stats.disk_budget_bytes)],['对象重放',c.object_duplicates,'内容相同的对象不重复计数'],['内容冲突',c.conflicts,'同 ID 内容不同，保留第一条'],['写入队列',stats.queue,'上限 128；满时返回 429']];
+  const items=[['可靠接收',c.requests,'全站 HTTP 确认次数'],['整包去重',c.duplicates,'相同原始字节只保存一份'],['待处理',(s.pending||0),'已落盘、等待建立查询视图'],['隔离消息',s.quarantined||0,'全站保留原文的异常消息'],['无效对象',c.invalid_objects,'逐对象校验未通过'],['磁盘占用',bytes(stats.disk_bytes),'预算 '+bytes(stats.disk_budget_bytes)],['对象重放',c.object_duplicates,'内容相同的对象不重复计数'],['内容冲突',c.conflicts,'同 ID 内容不同，保留第一条'],['写入队列',stats.queue,'上限 128；满时返回 429'],['待办原文',bytes(stats.pending_bytes||0),'压缩前字节数；原文已可靠保存'],['最老待办',(stats.oldest_pending_seconds||0)+' s','积压持续增长时请降低发生器速率'],['原始流量',bytes(c.bytes),'全站唯一消息原始字节累计']];
   $('#quality-summary').innerHTML=items.map(([label,n,note])=>`<div class="quality-stat"><strong>${typeof n==='number'?fmt(n):esc(n)}</strong>${label}<small>${esc(note)}</small></div>`).join('');
   if(stats.writer_error)$('#quality-summary').innerHTML+=`<div class="quality-stat">写入器已停止：${esc(stats.writer_error)}</div>`;
   $('#quarantine-list').innerHTML=quality.messages.map(m=>`<div class="issue-row"><div><p><span class="status warning">${m.status==='partial'?'部分异常':'已隔离'}</span> ${esc(m.error)}</p><small>MESSAGE #${m.id} · ${bytes(m.bytes)}</small></div><button class="button" data-receipt="${m.id}">查看原文 ↗</button></div>`).join('') || '<p class="empty-small" style="padding-left:20px">当前批次没有待核查消息。</p>';
@@ -235,7 +235,7 @@ async function generatorStatus(){try{const result=await api('/api/generator/stat
 $('#open-control').onclick=()=>{$('#gen-test-id').value='observe-'+new Date().toISOString().replace(/\D/g,'').slice(0,14);$('#control-dialog').showModal();generatorStatus();};
 $('#generator-form').onsubmit=async e=>{
   e.preventDefault();$('#start-generator').disabled=true;
-  const payload={workload:'objects',test_id:$('#gen-test-id').value.trim(),target_url:$('#gen-target').value,seed:42,batch_size:Number($('#gen-batch').value),workers:Number($('#gen-workers').value),objects_per_second:Number($('#gen-rate').value),rate_profile:'bursty',ramp_seconds:5,duration_seconds:Number($('#gen-duration').value),max_batches:20000,retries:2,objects:{scenario:'evolving',tree_every_batches:10}};
+  const payload={workload:'objects',test_id:$('#gen-test-id').value.trim(),target_url:$('#gen-target').value,seed:42,batch_size:Number($('#gen-batch').value),workers:Number($('#gen-workers').value),objects_per_second:Number($('#gen-rate').value),rate_profile:'bursty',ramp_seconds:Number($('#gen-rate').value)>0?5:0,duration_seconds:Number($('#gen-duration').value),max_batches:20000,retries:2,objects:{scenario:'evolving',tree_every_batches:10}};
   try{await api('/api/generator/start',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});state.run=payload.test_id;state.type=null;state.frame='';resetPage();fitMap();$('#control-dialog').close();toast('发生器已启动，新观测即将到达。');setTimeout(refresh,1500);}catch(error){toast(error.message);}finally{$('#start-generator').disabled=false;}
 };
 $('#stop-generator').onclick=async()=>{try{await api('/api/generator/stop',{method:'POST'});toast('已请求停止，发生器正在完成收尾。');generatorStatus();}catch(error){toast(error.message);}};

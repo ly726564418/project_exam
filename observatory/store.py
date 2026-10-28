@@ -195,6 +195,8 @@ class Store:
                     except (ValueError, TypeError, KeyError, OverflowError, RecursionError) as exc:
                         db.execute('ROLLBACK TO projection')
                         db.execute("UPDATE inbox SET status='quarantined',error=? WHERE id=?",(str(exc)[:1000],row['id']))
+                        failed=db.execute('SELECT run,received FROM inbox WHERE id=?',(row['id'],)).fetchone()
+                        db.execute('INSERT INTO runs(id,first_seen,last_seen) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET last_seen=MAX(last_seen,excluded.last_seen)',(failed['run'],failed['received'],failed['received']))
                         db.commit()
                     except Exception:
                         db.rollback()
@@ -225,6 +227,7 @@ class Store:
         headers = json.loads(row['headers'])
         if headers.get('x-flightgen-test-id',run) != run: raise ValueError('header/body test_id mismatch')
         kind = msg.get('kind')
+        if not isinstance(kind,str): raise ValueError('kind must be a string')
         db.execute('UPDATE inbox SET run=?,kind=? WHERE id=?',(run,kind,row['id']))
         now = time.time()
         db.execute('INSERT INTO runs(id,first_seen,last_seen) VALUES(?,?,?) ON CONFLICT(id) DO UPDATE SET last_seen=excluded.last_seen',(run,now,now))
@@ -303,9 +306,11 @@ class Store:
         statuses = {r['status']:r['n'] for r in self.read('SELECT status,COUNT(*) n FROM inbox GROUP BY status')}
         lat = sorted(self.latencies)
         series=list(self.series)
+        pending=self.read("SELECT MIN(received) oldest,COALESCE(SUM(bytes),0) bytes FROM inbox WHERE status='pending'")[0]
         rate = (series[-1]['objects']-series[-2]['objects']) / max(.001,series[-1]['time']-series[-2]['time']) if len(series)>1 else 0
         return {'counters':counters,'runs':runs,'statuses':statuses,'objects':sum(r['objects'] for r in runs),
             'types':self.read('SELECT COUNT(*) n FROM types')[0]['n'],'disk_bytes':self.disk_bytes(),
             'disk_budget_bytes':self.disk_budget,'queue':self.tasks.qsize(),'writer_error':self.fatal,
             'ack_p50_ms':lat[len(lat)//2] if lat else 0,'ack_p95_ms':lat[min(len(lat)-1,int(len(lat)*.95))] if lat else 0,
-            'objects_per_second':round(rate,1),'series':series}
+            'objects_per_second':round(rate,1),'series':series,'pending_bytes':pending['bytes'],
+            'oldest_pending_seconds':round(max(0,time.time()-pending['oldest']),1) if pending['oldest'] else 0}

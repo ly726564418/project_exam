@@ -1,0 +1,9 @@
+{
+  "test_id": "browser-control-1793193442",
+  "form_start_success": true,
+  "generator_proxy_success": true,
+  "received_objects": 719,
+  "normal_acknowledged_objects": 660,
+  "pending": 0,
+  "passed": true
+}

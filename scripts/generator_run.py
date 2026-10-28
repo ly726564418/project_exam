@@ -19,15 +19,25 @@ parser.add_argument('--generator',default='http://127.0.0.1:9001')
 parser.add_argument('--target',default='http://host.docker.internal:8000/ingest')
 parser.add_argument('--output',default='docs/results')
 parser.add_argument('--container',default='')
+parser.add_argument('--drain-seconds',type=int,default=600)
 args=parser.parse_args()
 opener=urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
 def request(url,data=None):
     req=urllib.request.Request(url,data=json.dumps(data).encode() if data is not None else None,headers={'Content-Type':'application/json'})
-    with opener.open(req,timeout=15) as r:return json.load(r)
+    try:
+        with opener.open(req,timeout=15) as r:return json.load(r)
+    except urllib.error.HTTPError as exc:
+        raise RuntimeError(f'{url}: HTTP {exc.code}: '+exc.read().decode(errors='replace')) from exc
 
+ready=False
+for _ in range(60):
+    try:
+        request(args.system+'/healthz');ready=True;break
+    except Exception:time.sleep(.5)
+if not ready:raise RuntimeError('system did not become healthy')
 before=request(args.system+'/api/stats')
-payload={'workload':'objects','target_url':args.target,'test_id':args.id,'seed':42,'batch_size':args.batch,'workers':args.workers,'objects_per_second':args.rate,'rate_profile':'bursty','ramp_seconds':2,'duration_seconds':args.seconds,'max_batches':50000,'retries':2,'objects':{'scenario':'evolving','tree_every_batches':10}}
+payload={'workload':'objects','target_url':args.target,'test_id':args.id,'seed':42,'batch_size':args.batch,'workers':args.workers,'objects_per_second':args.rate,'rate_profile':'bursty','ramp_seconds':2 if args.rate else 0,'duration_seconds':args.seconds,'max_batches':50000,'retries':2,'objects':{'scenario':'evolving','tree_every_batches':10}}
 request(args.generator+'/start',payload)
 latencies=[];errors=[];resources=[];deadline=time.monotonic()+args.seconds+60;last_resource=0
 while time.monotonic()<deadline:
@@ -44,11 +54,12 @@ while time.monotonic()<deadline:
 else:raise RuntimeError('generator did not finish')
 receipt=request(args.generator+'/receipt')
 drain_started=time.monotonic()
-while time.monotonic()-drain_started<120:
+while time.monotonic()-drain_started<args.drain_seconds:
     after=request(args.system+'/api/stats')
     if after['writer_error']:raise RuntimeError(after['writer_error'])
     if not after['statuses'].get('pending',0):break
     time.sleep(.2)
+else:raise RuntimeError('projection backlog did not drain within the configured deadline')
 run=next((r for r in after['runs'] if r['id']==args.id),None)
 latencies.sort()
 summary={'test_id':args.id,'target_rate':args.rate,'duration_seconds':args.seconds,'batch_size':args.batch,'workers':args.workers,

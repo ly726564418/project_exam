@@ -29,7 +29,7 @@ async def lifespan(app):
     await asyncio.to_thread(store.stop)
 
 
-app=FastAPI(title='Atlas · 宇宙万物观测站',version='1.0.0',lifespan=lifespan)
+app=FastAPI(title='Atlas · 宇宙万物观测站',version='1.0.0',lifespan=lifespan,docs_url=None,redoc_url=None)
 
 
 @app.middleware('http')
@@ -190,7 +190,8 @@ async def demo():
     return {'run':run,'demo':True}
 
 
-@app.api_route('/api/generator/{action}',methods=['GET','POST'])
+@app.get('/api/generator/{action}',operation_id='generator_read')
+@app.post('/api/generator/{action}',operation_id='generator_control')
 async def generator(action:str,request:Request):
     if action not in ('status','start','stop','rate','receipt'): raise HTTPException(404,'unsupported generator action')
     if request.method != ('GET' if action in ('status','receipt') else 'POST'): raise HTTPException(405,'incorrect method')
@@ -210,6 +211,10 @@ async def generator(action:str,request:Request):
 
 @app.get('/')
 def index():return FileResponse(WEB/'index.html')
+
+
+@app.get('/docs',include_in_schema=False)
+def api_docs():return FileResponse(WEB/'api.html')
 
 
 app.mount('/assets',StaticFiles(directory=WEB),name='assets')

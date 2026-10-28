@@ -1,0 +1,18 @@
+{
+  "test_id": "browser-control-1793193442",
+  "verified_raw_messages": 40,
+  "raw_digest_errors": 0,
+  "acknowledged_normal_batches": 33,
+  "acknowledged_normal_objects": 660,
+  "missing_acknowledged_objects": 0,
+  "missing_examples": [],
+  "valid_unique_objects_in_raw": 719,
+  "stored_objects": 719,
+  "invalid_objects_in_raw": 1,
+  "object_content_errors": 0,
+  "pending_messages": 0,
+  "verified_types": 30,
+  "type_content_errors": 0,
+  "missing_acknowledged_revisions": [],
+  "passed": true
+}

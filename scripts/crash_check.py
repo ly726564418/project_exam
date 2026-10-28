@@ -1,5 +1,6 @@
 """Kill a container after a real ACK, restart, replay, and verify every byte."""
 import concurrent.futures
+import argparse
 import hashlib
 import json
 import subprocess
@@ -8,8 +9,12 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-BASE='http://127.0.0.1:8002'
-CONTAINER='exam-atlas-arm64'
+parser=argparse.ArgumentParser()
+parser.add_argument('--system',default='http://127.0.0.1:8000')
+parser.add_argument('--container',required=True)
+args=parser.parse_args()
+BASE=args.system.rstrip('/')
+CONTAINER=args.container
 run='crash-'+str(int(time.time()))
 opener=urllib.request.build_opener(urllib.request.ProxyHandler({}))
 payloads=[]

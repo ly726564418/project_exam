@@ -100,6 +100,13 @@ def test_revision_history_out_of_order_and_descendant_queries(client):
     assert len(c.get('/api/objects?run=test&type_id=1').json()['items'])==1
     detail=c.get('/api/objects/obj-0?run=test').json()
     assert detail['observed_types'][0]['name']=='星体'
+    post(c,node(tid=3,parent=0,name='另一星区'))
+    post(c,node(revision=4,tid=2,parent=3,name='子类',op='move'))
+    wait_projection(s)
+    assert not c.get('/api/objects?run=test&type_id=1').json()['items']
+    assert len(c.get('/api/objects?run=test&type_id=3').json()['items'])==1
+    observed=c.get('/api/objects/obj-0?run=test').json()['observed_types']
+    assert next(t for t in observed if t['type_id']==2)['parent_id']==1
 
 
 def test_poison_messages_partial_batch_and_id_conflicts(client):
@@ -116,6 +123,25 @@ def test_poison_messages_partial_batch_and_id_conflicts(client):
     assert stats['counters']['conflicts']==1
     assert c.get('/api/objects/obj-0?run=test').json()['data']['name']==obj()['name']
     assert len(c.get('/api/quality?run=test').json()['issues'])==3
+
+
+def test_structurally_invalid_kind_cannot_stop_writer(client):
+    c,s=client
+    post(c,{'test_id':'test','kind':{'unexpected':'object'}})
+    post(c,batch([obj()]))
+    wait_projection(s)
+    assert s.fatal is None
+    assert c.get('/healthz').status_code==200
+    assert c.get('/api/stats').json()['objects']==1
+
+
+def test_quarantine_only_run_is_visible_for_exploration(client):
+    c,s=client
+    c.post('/ingest',content=b'{broken',headers={'X-Flightgen-Test-Id':'only-bad'})
+    wait_projection(s)
+    runs=c.get('/api/stats').json()['runs']
+    assert any(r['id']=='only-bad' and r['objects']==0 for r in runs)
+    assert len(c.get('/api/quality?run=only-bad').json()['messages'])==1
 
 
 def test_typed_numeric_filters_cursor_and_schema_drift(client):
@@ -189,3 +215,9 @@ def test_http_bounds_and_static_assets(client):
     assert c.get('/api/generator/evil').status_code==404
     assert c.get('/').status_code==200
     assert c.get('/assets/app.js').status_code==200
+    assert c.get('/docs').status_code==200
+    assert c.get('/assets/api-docs.js').status_code==200
+    specification=c.get('/openapi.json').json()
+    assert '/ingest' in specification['paths']
+    operation_ids=[operation['operationId'] for methods in specification['paths'].values() for operation in methods.values()]
+    assert len(operation_ids)==len(set(operation_ids))

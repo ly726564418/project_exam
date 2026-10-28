@@ -1,0 +1,30 @@
+{
+  "runtime": {
+    "machine": "aarch64",
+    "python": "3.12.16",
+    "sqlite": "3.46.1",
+    "platform": "Linux-6.6.87.2-microsoft-standard-WSL2-aarch64-with-glibc2.41"
+  },
+  "backend_limits": {
+    "memory": 4294967296,
+    "cpus": 4,
+    "memory_swap": 4294967296
+  },
+  "benchmark_image": "sha256:03546511d85320ba3ccf519c5c4e2dad15d95b427c425b65700ab8755807568d",
+  "environment": "Windows / WSL2 x86_64, Docker Desktop ARM64 emulation",
+  "sqlite_quick_check": "ok",
+  "dataset": {
+    "objects": 136090,
+    "disk_bytes": 322435336,
+    "statuses": {
+      "partial": 10,
+      "projected": 827
+    },
+    "writer_error": null
+  },
+  "generator_limits": {
+    "memory": 268435456,
+    "cpus": 1,
+    "memory_swap": 268435456
+  }
+}

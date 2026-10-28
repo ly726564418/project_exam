@@ -17,12 +17,20 @@ args=parser.parse_args()
 with open(args.receipt,encoding='utf-8') as f:receipt=json.load(f)
 run=receipt['config']['test_id'];batch_size=receipt['config']['batch_size']
 db=sqlite3.connect('file:'+args.db+'?mode=ro',uri=True)
-seen=set();invalid=0;raw_count=0;digest_errors=0;object_errors=0
+seen=set();invalid=0;raw_count=0;digest_errors=0;object_errors=0;type_errors=0;revisions=set();latest_types={}
 for digest,compressed,status in db.execute('SELECT digest,body,status FROM inbox WHERE run=? ORDER BY id',(run,)):
     raw=zlib.decompress(compressed);raw_count+=1
     if hashlib.sha256(raw).hexdigest()!=digest:digest_errors+=1
     try:message=json.loads(raw)
     except (ValueError,UnicodeError):continue
+    if message.get('kind')=='types':
+        revision=message['revision'];revisions.add(revision)
+        for change in message['changes']:
+            node=change['node'];tid=node['type_id']
+            row=db.execute('SELECT parent_id,name,op FROM type_history WHERE run=? AND type_id=? AND revision=?',(run,tid,revision)).fetchone()
+            if not row or tuple(row)!=(node['parent_id'],node['name'],change['op']):type_errors+=1
+            if tid not in latest_types or revision>latest_types[tid][0]:latest_types[tid]=(revision,node['parent_id'],node['name'])
+        continue
     if message.get('kind')!='objects':continue
     for obj in message.get('objects',[]):
         if Store.validate_object(obj):invalid+=1;continue
@@ -39,11 +47,16 @@ for batch_id in ack_batches:
         if object_id not in seen:missing.append(object_id)
 stored=db.execute('SELECT COUNT(*) FROM objects WHERE run=?',(run,)).fetchone()[0]
 pending=db.execute("SELECT COUNT(*) FROM inbox WHERE run=? AND status='pending'",(run,)).fetchone()[0]
+for tid,expected in latest_types.items():
+    row=db.execute('SELECT revision,parent_id,name FROM types WHERE run=? AND type_id=?',(run,tid)).fetchone()
+    if not row or tuple(row)!=expected:type_errors+=1
+missing_revisions=[r for r in range(1,receipt.get('tree',{}).get('acknowledged_revision',0)+1) if r not in revisions]
 result={'test_id':run,'verified_raw_messages':raw_count,'raw_digest_errors':digest_errors,
     'acknowledged_normal_batches':len(ack_batches),'acknowledged_normal_objects':receipt['stats']['acknowledged_objects'],
     'missing_acknowledged_objects':len(missing),'missing_examples':missing[:10],
     'valid_unique_objects_in_raw':len(seen),'stored_objects':stored,'invalid_objects_in_raw':invalid,
-    'object_content_errors':object_errors,'pending_messages':pending}
-result['passed']=not(digest_errors or object_errors or missing or pending) and len(seen)==stored
+    'object_content_errors':object_errors,'pending_messages':pending,'verified_types':len(latest_types),
+    'type_content_errors':type_errors,'missing_acknowledged_revisions':missing_revisions}
+result['passed']=not(digest_errors or object_errors or missing or pending or type_errors or missing_revisions) and len(seen)==stored
 print(json.dumps(result,ensure_ascii=False,indent=2))
 raise SystemExit(0 if result['passed'] else 1)

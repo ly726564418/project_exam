@@ -13,7 +13,7 @@
 ```bash
 git clone https://github.com/ly726564418/project_exam.git
 cd project_exam
-docker compose up --build -d
+docker compose up --build -d --wait
 curl -fsS http://localhost:8000/healthz
 ```
 
@@ -48,7 +48,7 @@ curl -fsS http://127.0.0.1:9001/status
 curl -fsS http://127.0.0.1:9001/receipt -o acceptance-001-receipt.json
 ```
 
-每轮使用新的 `test_id`。速率 0 表示尽力发送，不是暂停。停止：`curl -fsS -X POST http://127.0.0.1:9001/stop`，返回 202 后仍需等待 `finished`。发生器单独计入 **1 vCPU / 256 MiB**。
+每轮使用新的 `test_id`。速率 0 表示尽力发送，不是暂停，启动时应同时设置 `ramp_seconds: 0`；界面会自动处理。停止：`curl -fsS -X POST http://127.0.0.1:9001/stop`，返回 202 后仍需等待 `finished`。发生器单独计入 **1 vCPU / 256 MiB**。
 
 Mac 使用 Docker Desktop 的 `host.docker.internal`。Linux 宿主机访问由 Compose 的 `host-gateway` 配置提供；单独运行发生器时也需根据环境设置该映射。可通过 `ATLAS_GENERATOR_URL` 更改系统控制发生器的地址。
 
@@ -101,11 +101,14 @@ python scripts/generator_run.py --rate 1000 --seconds 20 --id my-new-run
 
 | 测试 | 结果 |
 | --- | --- |
-| 自动化正确性 | 11 项通过：持久化、并发去重、分类乱序/历史、毒消息、冲突、类型筛选、游标、参考系、跨批次隔离、恢复、边界 |
-| 浏览器端到端 | Edge headless，1600×1100 / 390×844，12 项交互检查通过，0 脚本错误，无手机横向溢出 |
+| 自动化正确性 | 13 项通过：持久化、并发去重、分类乱序/历史/迁移、毒消息、冲突、类型筛选、游标、参考系、跨批次隔离、恢复、边界、隔离批次可见性 |
+| 浏览器端到端 | Edge headless，1600×1100 / 390×844，13 项检查通过，含本地接口文档，0 脚本错误，无手机横向溢出 |
 | Windows 原生，官方发生器，目标 1,000 对象/秒，15 秒 | 确认常规对象 10,100；注入额外有效对象 198、无效对象 2；4 次重复包去重；无重试/超时；并行档案查询 P95 41.53 ms |
 | 受限 ARM64 仿真容器，目标 5,000 对象/秒，30 秒 | 常规确认 13,500，即实测约 450 对象/秒；查询 P95 331.88 ms；采样内存最高 166.7 MiB；无超时、重试或 5xx；结束时 4 个请求响应被发生器中断，接收端仍完整保存 |
+| 受限 ARM64，独立饱和复测，30 秒，batch=200、workers=8 | 常规 52,000 对象全部确认，原文确认约 1,733/s；查询 P95 365.02 ms；采样内存最高 284.9 MiB；停止发送后另用约 75 秒物化完积压。不是可持续物化吞吐 |
 | 强杀恢复 | 在 6 条消息已确认时 SIGKILL；18 条请求中断；重启后重放全部 24 条消息，2,400 对象完整、无重复计数；已确认 receipt 和所有原始字节逐条校对通过 |
+
+受限容器中累计收录 **136,090** 个有效对象，数据库、WAL 等占用约 **307.5 MiB**。分类历史与原文均保留。完整测试条件、运行终止时的树消息取消和诊断轮次的干扰说明见 [结果索引](docs/results/README.md)。饱和复测与对象/分类内容校对均提供原始文件。
 
 `objects_per_second` 是目标值，bursty 波动、爬坡和发生器性能均影响实际吞吐，不能将目标值当作实测结果。额外注入批次不计入发生器 `acknowledged_objects`，系统有效对象数可能高于该数。无效消息的 202 表示原文完整保存，不代表业务校验通过。
 
