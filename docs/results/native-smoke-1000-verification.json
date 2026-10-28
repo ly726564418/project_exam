@@ -1,0 +1,15 @@
+{
+  "test_id": "native-smoke-1000",
+  "verified_raw_messages": 114,
+  "raw_digest_errors": 0,
+  "acknowledged_normal_batches": 101,
+  "acknowledged_normal_objects": 10100,
+  "missing_acknowledged_objects": 0,
+  "missing_examples": [],
+  "valid_unique_objects_in_raw": 10298,
+  "stored_objects": 10298,
+  "invalid_objects_in_raw": 2,
+  "object_content_errors": 0,
+  "pending_messages": 0,
+  "passed": true
+}

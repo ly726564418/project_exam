@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 import pytest
 from fastapi.testclient import TestClient
 from observatory import app as module
-from observatory.store import Store, StorageFull, dumps
+from observatory.store import Store, StorageFull, Busy, dumps
 
 
 @pytest.fixture
@@ -78,6 +78,14 @@ def test_concurrent_redelivery_is_idempotent(client):
     # Logical object dedupe also survives reserialization / another batch envelope.
     post(c,batch([obj(0)],batch_id=10));wait_projection(s)
     assert c.get('/api/stats').json()['counters']['object_duplicates']==1
+    # Key ordering is not a change in object content.
+    reordered=dict(reversed(list(obj(0).items())))
+    reordered['attributes']=dict(reversed(list(reordered['attributes'].items())))
+    response=c.post('/ingest',json=batch([reordered],batch_id=11))
+    assert response.status_code==202
+    wait_projection(s)
+    assert c.get('/api/stats').json()['counters']['object_duplicates']==2
+    assert c.get('/api/stats').json()['counters']['conflicts']==0
 
 
 def test_revision_history_out_of_order_and_descendant_queries(client):
@@ -165,6 +173,12 @@ def test_pending_inbox_recovered_after_restart(tmp_path):
 def test_disk_budget_returns_no_success_ack(tmp_path):
     s=Store(tmp_path/'full.sqlite',disk_budget_mb=1)
     with pytest.raises(StorageFull):s.submit(b'{}',{})
+
+
+def test_admission_queue_is_bounded(tmp_path):
+    s=Store(tmp_path/'queue.sqlite')
+    for _ in range(128):s.submit(b'{}',{})
+    with pytest.raises(Busy):s.submit(b'{}',{})
 
 
 def test_http_bounds_and_static_assets(client):

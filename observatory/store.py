@@ -57,7 +57,7 @@ PRAGMA user_version=1;
 
 
 def dumps(value):
-    return json.dumps(value, ensure_ascii=False, separators=(',', ':'), allow_nan=False)
+    return json.dumps(value, ensure_ascii=False, separators=(',', ':'), allow_nan=False, sort_keys=True)
 
 
 def integer(value, minimum=0):
@@ -76,7 +76,7 @@ def field_kind(value):
 def flatten(value, prefix='', depth=0):
     for key, item in value.items():
         path = f'{prefix}.{key}' if prefix else key
-        yield path, field_kind(item), dumps(item)[:180]
+        yield path, field_kind(item), item
         if isinstance(item, dict) and depth < 2:
             yield from flatten(item, path, depth + 1)
 
@@ -109,6 +109,9 @@ class Store:
             db.execute('PRAGMA synchronous=FULL')
             db.execute('PRAGMA cache_size=-32768')
             db.execute('PRAGMA journal_size_limit=67108864')
+            # Hard ceiling for main DB; leave budget headroom for WAL and metadata.
+            page_size = db.execute('PRAGMA page_size').fetchone()[0]
+            db.execute('PRAGMA max_page_count='+str(max(256,(self.disk_budget-128*1024*1024)//page_size)))
         db.row_factory = sqlite3.Row
         return db
 
@@ -181,6 +184,7 @@ class Store:
                             if not task[2].done(): task[2].set_result(result)
                 # Inbox is the persistent work queue: restart requires no replay from sender.
                 pending = db.execute("SELECT id,body,headers FROM inbox WHERE status='pending' ORDER BY id LIMIT 8").fetchall()
+                projection_started=time.perf_counter()
                 for row in pending:
                     try:
                         db.execute('BEGIN IMMEDIATE')
@@ -195,6 +199,8 @@ class Store:
                     except Exception:
                         db.rollback()
                         raise
+                    if not self.tasks.empty() and time.perf_counter()-projection_started > .05:
+                        break
                 now = time.time()
                 if now - last_tick >= 1:
                     counts = dict(db.execute('SELECT key,value FROM counters').fetchall())
@@ -266,7 +272,7 @@ class Store:
                 for path, value_kind, example in flatten(attrs):
                     key=(run,obj['type_id'],path,value_kind)
                     fields[key]+=1
-                    examples[key]=example
+                    if key not in examples: examples[key]=dumps(example)[:180]
             db.executemany('INSERT INTO fields VALUES(?,?,?,?,?,?) ON CONFLICT(run,type_id,path,kind) DO UPDATE SET count=count+excluded.count',
                 [(*key,count,examples[key]) for key,count in fields.items()])
             db.executemany('INSERT INTO type_counts VALUES(?,?,?) ON CONFLICT(run,type_id) DO UPDATE SET count=count+excluded.count',[(*key,count) for key,count in type_counts.items()])

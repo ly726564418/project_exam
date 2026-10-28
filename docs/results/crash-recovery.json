@@ -1,0 +1,13 @@
+{
+  "test_id": "crash-1793191779",
+  "signal": "SIGKILL",
+  "acknowledged_before_kill": 6,
+  "requests_interrupted": 18,
+  "replayed_messages": 24,
+  "objects_after_recovery": 2400,
+  "expected_objects": 2400,
+  "acknowledged_receipts_preserved": true,
+  "all_raw_bytes_verified": true,
+  "duplicate_replay_no_double_count": true,
+  "passed": true
+}

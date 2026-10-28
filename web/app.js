@@ -6,7 +6,7 @@ const fmt = n => new Intl.NumberFormat('zh-CN').format(n || 0);
 const bytes = n => n >= 1073741824 ? (n / 1073741824).toFixed(2) + ' GiB' : n >= 1048576 ? (n / 1048576).toFixed(1) + ' MiB' : (n / 1024).toFixed(1) + ' KiB';
 const when = ms => new Date(ms).toLocaleString('zh-CN', {hour12:false});
 const palettes = ['#c2db92','#92b98d','#acc9b4','#7e9e80','#d1d4b1','#7d958e','#a3af7d','#c4c8bd'];
-const state = {run:'', type:null, view:'explore', live:true, types:[], history:[], objects:[], frames:[], points:[], frame:'', cursor:null, cursors:[], next:null, q:'', anomaly:false, attr:'', value:'', minimum:'', maximum:'', stats:null, map:null, loading:false, hovered:null, zoom:1, panX:0, panY:0, lastFocus:null};
+const state = {run:'', type:null, view:'explore', live:true, types:[], typeMap:new Map(), children:new Map(), totals:new Map(), topIds:new Map(), collapsed:new Set(), history:[], objects:[], frames:[], points:[], frame:'', cursor:null, cursors:[], next:null, q:'', anomaly:false, attr:'', value:'', minimum:'', maximum:'', stats:null, map:null, loading:false, hovered:null, zoom:1, panX:0, panY:0, lastFocus:null};
 let toastTimer;
 function toast(message) { $('#toast').textContent = message; $('#toast').classList.remove('hidden'); clearTimeout(toastTimer); toastTimer = setTimeout(() => $('#toast').classList.add('hidden'), 5200); }
 async function api(path, options={}) {
@@ -16,10 +16,11 @@ async function api(path, options={}) {
 }
 function url(path, extra={}) { const params=new URLSearchParams({run:state.run,...extra}); for (const [k,v] of [...params.entries()]) if (v === '' || v === 'null' || v === 'undefined') params.delete(k); return path+'?'+params; }
 function selectedName() { return state.types.find(t => t.type_id === state.type)?.name || '全部对象'; }
-function typeName(id) { return state.types.find(t => t.type_id === id)?.name || '待识别分类 #'+id; }
+function typeName(id) { return state.typeMap.get(id)?.name || '待识别分类 #'+id; }
 function topType(id) {
-  const seen=new Set(); let node=state.types.find(t=>t.type_id===id), last=id;
-  while(node && node.parent_id && !seen.has(node.type_id)) { seen.add(node.type_id); const parent=state.types.find(t=>t.type_id===node.parent_id); if(!parent || !parent.parent_id) return node.type_id; last=node.type_id;node=parent; }
+  if(state.topIds.has(id))return state.topIds.get(id);
+  const seen=new Set(); let node=state.typeMap.get(id), last=id;
+  while(node && node.parent_id && !seen.has(node.type_id)) { seen.add(node.type_id); const parent=state.typeMap.get(node.parent_id); if(!parent || !parent.parent_id){state.topIds.set(id,node.type_id);return node.type_id;} last=node.type_id;node=parent; }
   return last;
 }
 function colorFor(id) { return palettes[Math.abs(topType(id)-2)%palettes.length]; }
@@ -50,18 +51,19 @@ function renderTree() {
   const needle=$('#type-search').value.trim().toLowerCase(), nodes=state.types;
   if(!nodes.length){$('#type-tree').innerHTML='<p class="empty-small">分类会随首条消息到达。</p>';return;}
   const result=[],visited=new Set();
-  const totalFor=(id,seen=new Set())=>{if(seen.has(id))return 0;seen.add(id);return (nodes.find(n=>n.type_id===id)?.count || 0)+nodes.filter(n=>n.parent_id===id).reduce((s,n)=>s+totalFor(n.type_id,seen),0);};
+  const totalFor=(id,seen=new Set())=>{if(seen.has(id))return 0;if(state.totals.has(id))return state.totals.get(id);seen.add(id);const total=(state.typeMap.get(id)?.count || 0)+(state.children.get(id)||[]).reduce((s,n)=>s+totalFor(n.type_id,seen),0);state.totals.set(id,total);return total;};
   const walk=(node,depth)=>{
     if(visited.has(node.type_id))return;visited.add(node.type_id);
-    const children=nodes.filter(n=>n.parent_id===node.type_id);
-    if(!needle || node.name.toLowerCase().includes(needle))result.push(`<button class="tree-node ${state.type===node.type_id?'active':''}" style="--depth:${Math.min(depth,6)}" data-type="${node.type_id}" title="${esc(pathFor(node.type_id))}"><span class="tree-branch">${children.length?'⌄':'·'}</span><span class="tree-name">${esc(node.name)}</span><span class="tree-count">${fmt(totalFor(node.type_id))}</span></button>`);
-    children.forEach(n=>walk(n,depth+1));
+    const children=state.children.get(node.type_id)||[];
+    if(!needle || node.name.toLowerCase().includes(needle))result.push(`<button class="tree-node ${state.type===node.type_id?'active':''}" style="--depth:${Math.min(depth,6)}" data-type="${node.type_id}" title="${esc(pathFor(node.type_id))}"><span class="tree-branch" ${children.length?`data-expand="${node.type_id}" title="展开或收起子分类"`:''}>${children.length?(state.collapsed.has(node.type_id)?'›':'⌄'):'·'}</span><span class="tree-name">${esc(node.name)}</span><span class="tree-count">${fmt(totalFor(node.type_id))}</span></button>`);
+    if(!state.collapsed.has(node.type_id)||needle)children.forEach(n=>walk(n,depth+1));
+    else {const mark=(id)=>{for(const n of state.children.get(id)||[]){if(!visited.has(n.type_id)){visited.add(n.type_id);mark(n.type_id);}}};mark(node.type_id);}
   };
-  nodes.filter(n=>!n.parent_id || !nodes.some(p=>p.type_id===n.parent_id)).forEach(n=>walk(n,0));
+  nodes.filter(n=>!n.parent_id || !state.typeMap.has(n.parent_id)).forEach(n=>walk(n,0));
   nodes.forEach(n=>{if(!visited.has(n.type_id))walk(n,0);});
   $('#type-tree').innerHTML=result.join('') || '<p class="empty-small">没有匹配的分类。</p>';
   $('#map-type-label').textContent=selectedName();$('#catalog-type-label').textContent=selectedName();
-  const roots=nodes.filter(n=>nodes.some(p=>p.type_id===n.parent_id && p.parent_id===0));
+  const roots=nodes.filter(n=>state.typeMap.get(n.parent_id)?.parent_id===0);
   $('#type-distribution').innerHTML=roots.map(n=>({...n,total:totalFor(n.type_id)})).sort((a,b)=>b.total-a.total).slice(0,4).map(n=>`<div class="distribution-row"><span><i class="type-color" style="background:${colorFor(n.type_id)}"></i>${esc(n.name)}</span><b>${fmt(n.total)}</b></div>`).join('') || '<p class="empty-small">分类分布等待观测。</p>';
 }
 function renderFrames() {
@@ -116,7 +118,9 @@ async function refresh() {
     state.stats=await api('/api/stats');
     if(!state.run || !state.stats.runs.some(r=>r.id===state.run))state.run=state.stats.runs[0]?.id || '';
     const [taxonomy,frames]=await Promise.all([api(url('/api/types')),api(url('/api/frames'))]);
-    state.types=taxonomy.types;state.history=taxonomy.history;state.frames=frames;
+    state.types=taxonomy.types;state.typeMap=new Map(state.types.map(n=>[n.type_id,n]));state.children=new Map();state.totals.clear();state.topIds.clear();
+    for(const n of state.types){if(!state.children.has(n.parent_id))state.children.set(n.parent_id,[]);state.children.get(n.parent_id).push(n);}
+    state.history=taxonomy.history;state.frames=frames;
     if(!frames.some(f=>f.frame===state.frame)) {state.frame=frames[0]?.frame || '';fitMap();}
     renderRuns();renderTree();renderFrames();renderMetrics();
     await loadObjects();
@@ -211,7 +215,7 @@ canvas.addEventListener('keydown',e=>{if(e.key==='+'||e.key==='='){state.zoom=Ma
 new ResizeObserver(()=>{drawMap();drawPulse();}).observe($('.map-wrap'));
 $('#zoom-in').onclick=()=>{state.zoom=Math.min(18,state.zoom*1.35);drawMap();};$('#zoom-out').onclick=()=>{state.zoom=Math.max(.3,state.zoom/1.35);drawMap();};$('#zoom-fit').onclick=()=>{fitMap();drawMap();};
 $$('[data-view]').forEach(n=>n.onclick=()=>changeView(n.dataset.view));$('#view-all').onclick=()=>changeView('catalog');
-$('#type-tree').onclick=e=>{const n=e.target.closest('[data-type]');if(n)chooseType(Number(n.dataset.type));};$('#clear-type').onclick=()=>chooseType(null);$('#type-search').oninput=renderTree;
+$('#type-tree').onclick=e=>{const expand=e.target.closest('[data-expand]');if(expand){const id=Number(expand.dataset.expand);state.collapsed.has(id)?state.collapsed.delete(id):state.collapsed.add(id);renderTree();return;}const n=e.target.closest('[data-type]');if(n)chooseType(Number(n.dataset.type));};$('#clear-type').onclick=()=>chooseType(null);$('#type-search').oninput=renderTree;
 $('#run-select').onchange=async e=>{state.run=e.target.value;state.type=null;state.frame='';resetPage();fitMap();await refresh();};
 $('#frame-select').onchange=e=>{state.frame=e.target.value;fitMap();loadMap().catch(e=>toast(e.message));};
 $('#demo-button').onclick=seedDemo;$('#empty-demo').onclick=seedDemo;
